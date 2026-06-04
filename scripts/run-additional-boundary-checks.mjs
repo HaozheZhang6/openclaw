@@ -14,6 +14,7 @@ export const BOUNDARY_CHECKS = [
   ["lint:tmp:tsgo-core-boundary", "pnpm", ["run", "lint:tmp:tsgo-core-boundary"]],
   ["lint:tmp:no-raw-channel-fetch", "pnpm", ["run", "lint:tmp:no-raw-channel-fetch"]],
   ["lint:tmp:no-raw-http2-imports", "pnpm", ["run", "lint:tmp:no-raw-http2-imports"]],
+  ["lint:tmp:session-accessor-boundary", "pnpm", ["run", "lint:tmp:session-accessor-boundary"]],
   ["lint:agent:ingress-owner", "pnpm", ["run", "lint:agent:ingress-owner"]],
   [
     "lint:plugins:no-register-http-handler",
@@ -442,11 +443,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.env.OPENCLAW_ADDITIONAL_BOUNDARY_CONCURRENCY === undefined
       ? "OPENCLAW_EXTENSION_BOUNDARY_CONCURRENCY"
       : "OPENCLAW_ADDITIONAL_BOUNDARY_CONCURRENCY";
-  const concurrency = resolveConcurrency(
-    concurrencyRaw,
-    4,
-    concurrencyLabel,
-  );
+  const concurrency = resolveConcurrency(concurrencyRaw, 4, concurrencyLabel);
   const checkTimeoutMs = resolvePositiveInteger(
     process.env.OPENCLAW_ADDITIONAL_BOUNDARY_TIMEOUT_MS,
     DEFAULT_CHECK_TIMEOUT_MS,
