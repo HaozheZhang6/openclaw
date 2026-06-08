@@ -116,7 +116,7 @@ describe("tasks commands", () => {
   it("keeps audit JSON stable and sorts combined findings before limiting", async () => {
     await withTaskCommandStateDir(async () => {
       const now = Date.now();
-      vi.useFakeTimers();
+      vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(now - 40 * 60_000);
       createTaskRecord({
         runtime: "cli",
@@ -187,7 +187,7 @@ describe("tasks commands", () => {
   it("explains stale running tasks retained by backing sessions in maintenance JSON", async () => {
     await withTaskCommandStateDir(async (state) => {
       const now = Date.now();
-      vi.useFakeTimers();
+      vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(now - 45 * 60_000);
       const childSessionKey = "agent:main:subagent:child-retained";
       const task = createTaskRecord({
@@ -236,7 +236,7 @@ describe("tasks commands", () => {
   it("explains task maintenance decisions before applying session registry pruning", async () => {
     await withTaskCommandStateDir(async (state) => {
       const now = Date.now();
-      vi.useFakeTimers();
+      vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(now - 45 * 60_000);
       const childSessionKey = "agent:main:cron:done-job:run:old-run";
       const task = createTaskRecord({
@@ -429,7 +429,7 @@ describe("tasks commands", () => {
   it("applies a conservative session registry sweep for stale cron run sessions", async () => {
     await withTaskCommandStateDir(async (state) => {
       const now = Date.now();
-      vi.useFakeTimers();
+      vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(now);
       const sessionsDir = state.sessionsDir("main");
       const storePath = path.join(sessionsDir, "sessions.json");
