@@ -7,7 +7,11 @@ import {
   createEmptyPluginRegistry,
   setActivePluginRegistry,
 } from "openclaw/plugin-sdk/plugin-test-runtime";
-import { clearSessionStoreCacheForTest } from "openclaw/plugin-sdk/session-store-runtime";
+import {
+  clearSessionStoreCacheForTest,
+  saveSessionStore,
+  type SessionEntry,
+} from "openclaw/plugin-sdk/session-store-runtime";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChannelType, type AutocompleteInteraction } from "../internal/discord.js";
 import { createNoopThreadBindingManager } from "./thread-bindings.js";
@@ -199,7 +203,7 @@ describe("discord native /think autocomplete", () => {
       await loadDiscordThinkAutocompleteModulesForTest());
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     clearSessionStoreCacheForTest();
     ensureConfiguredBindingRouteReadyMock.mockReset();
     ensureConfiguredBindingRouteReadyMock.mockResolvedValue({ ok: true });
@@ -219,16 +223,17 @@ describe("discord native /think autocomplete", () => {
     );
     installProviderThinkingRegistryForTest();
     fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
-    fs.writeFileSync(
+    await saveSessionStore(
       STORE_PATH,
-      JSON.stringify({
+      {
         [SESSION_KEY]: {
+          sessionId: SESSION_KEY,
           updatedAt: Date.now(),
           providerOverride: "openai",
           modelOverride: "gpt-5.4",
         },
-      }),
-      "utf8",
+      } as Record<string, SessionEntry>,
+      { skipMaintenance: true },
     );
   });
 
@@ -318,16 +323,17 @@ describe("discord native /think autocomplete", () => {
           ? { levels: [{ id: "off" }, { id: "max" }] }
           : undefined,
     );
-    fs.writeFileSync(
+    await saveSessionStore(
       STORE_PATH,
-      JSON.stringify({
+      {
         [SESSION_KEY]: {
+          sessionId: SESSION_KEY,
           updatedAt: Date.now(),
           providerOverride: "anthropic",
           modelOverride: "claude-opus-4-7",
         },
-      }),
-      "utf8",
+      } as Record<string, SessionEntry>,
+      { skipMaintenance: true },
     );
     const cfg = createConfig();
     resolveConfiguredBindingRouteMock.mockImplementation(createConfiguredRouteResult);
