@@ -826,6 +826,46 @@ describe("redactSensitiveText", () => {
     expect(output).toBe(input);
   });
 
+  it("does not corrupt base64 blobs that embed token-prefix shapes", () => {
+    // Tiny-PNG base64 contains a gAAAA run from zero-filled IHDR bytes; pure-base64-alphabet
+    // prefixes must not fire mid-blob or media payloads get mangled.
+    const dataUrl =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+    expect(redactSensitiveText(dataUrl, { mode: "tools" })).toBe(dataUrl);
+    const blobWithUppercaseRun = `blob: ${"x".repeat(4)}AKIAABCDEFGHIJKLMNOPqrstuv`;
+    expect(redactSensitiveText(blobWithUppercaseRun, { mode: "tools" })).toBe(blobWithUppercaseRun);
+    const dataUrlWithPlusBoundary = `data:application/octet-stream;base64,AAAA+gAAAA${"B".repeat(24)}`;
+    expect(redactSensitiveText(dataUrlWithPlusBoundary, { mode: "tools" })).toBe(
+      dataUrlWithPlusBoundary,
+    );
+    expect(redactSensitiveText("aws AKIA_ID=AKIAABCDEFGHIJKLMNOP", { mode: "tools" })).toBe(
+      "aws AKIA_ID=AKIAAB…MNOP",
+    );
+  });
+
+  it("does not corrupt large data URLs across chunked replacement boundaries", () => {
+    // replacePatternBounded slices 32 KiB+ inputs into 16 KiB chunks; a chunk start must not
+    // satisfy the pure-base64 prefix boundary (`^`) or hide the `;base64,` container from its
+    // lookbehind, so the boundary patterns run unchunked.
+    const prefix = "data:application/octet-stream;base64,";
+    const chunkSize = 16_384;
+    const pad = "A".repeat(chunkSize * 2 - prefix.length);
+    const dataUrl = `${prefix}${pad}gAAAA${"B".repeat(24)}${"C".repeat(chunkSize)}`;
+    expect(redactSensitiveText(dataUrl, { mode: "tools" })).toBe(dataUrl);
+  });
+
+  it("masks pure-base64-alphabet tokens after URL and path delimiters", () => {
+    const fernet = `gAAAA${"B".repeat(24)}`;
+    const reset = `https://app.example/reset/${fernet} visited`;
+    const output = redactSensitiveText(reset, { mode: "tools" });
+    expect(output).not.toContain(fernet);
+    expect(output).toContain("https://app.example/reset/");
+    const s3Path = "fetch /buckets/AKIAABCDEFGHIJKLMNOP/objects";
+    expect(redactSensitiveText(s3Path, { mode: "tools" })).toBe(
+      "fetch /buckets/AKIAAB…MNOP/objects",
+    );
+  });
+
   it("masks bare sensitive query and form keys through the default options path", () => {
     expect(
       redactSensitiveText("GET https://example.test/oauth?code=opaque-grant-123", {

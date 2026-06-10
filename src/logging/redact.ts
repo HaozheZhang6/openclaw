@@ -118,6 +118,10 @@ const ESCAPED_ENV_ASSIGNMENT_REDACT_PATTERN = String.raw`/\b[A-Z0-9_]*(?:KEY|TOK
 // quotes still mask like plain values instead of escaping both patterns.
 const STANDALONE_ASSIGNMENT_QUOTED_REDACT_PATTERN = String.raw`(^|[\s,;])(?:${STANDALONE_ASSIGNMENT_SECRET_KEYS})=(["'\x60])((?:(?!\2)[^\r\n])+)\2`;
 const STANDALONE_ASSIGNMENT_REDACT_PATTERN = String.raw`(^|[\s,;])(?:${STANDALONE_ASSIGNMENT_SECRET_KEYS})=(["'\x60]?[^\s&#"'\x60<>]+)`;
+// Pure-base64-alphabet token prefixes: require a non-alphanumeric left boundary (URL/path
+// delimiters like `/` and `=` still qualify) but skip explicit `;base64,` payload spans, so
+// data-URL media is never corrupted while tokens in URL paths or assignments still redact.
+const BASE64_SAFE_TOKEN_BOUNDARY = String.raw`(^|[^A-Za-z0-9])(?<!;base64,[A-Za-z0-9+/=]*)`;
 const SHELL_REFERENCE_PRESERVING_PATTERN_SOURCES = new Set([
   ENV_ASSIGNMENT_REDACT_PATTERN,
   ESCAPED_ENV_ASSIGNMENT_REDACT_PATTERN,
@@ -125,6 +129,10 @@ const SHELL_REFERENCE_PRESERVING_PATTERN_SOURCES = new Set([
   STANDALONE_ASSIGNMENT_REDACT_PATTERN,
 ]);
 const shellReferencePreservingPatterns = new WeakSet<RegExp>();
+// Patterns whose left-context assertions (BASE64_SAFE_TOKEN_BOUNDARY) break under chunked
+// replacement: a chunk start satisfies `^` and hides the `;base64,` container from the
+// lookbehind, so these must always run against the full string.
+const chunkUnsafePatterns = new WeakSet<RegExp>();
 
 const DEFAULT_REDACT_PATTERNS: string[] = [
   // ENV-style assignments. Keep this case-sensitive so diagnostics like
@@ -183,7 +191,9 @@ const DEFAULT_REDACT_PATTERNS: string[] = [
   String.raw`(fal_[A-Za-z0-9_-]{10,})`,
   String.raw`(fc-[A-Za-z0-9]{10,})`,
   String.raw`(bb_live_[A-Za-z0-9_-]{10,})`,
-  String.raw`(gAAAA[A-Za-z0-9_=-]{20,})`,
+  // Prefixes made only of standard-base64 characters need a non-base64 left boundary so they
+  // do not fire inside unrelated base64 blobs (e.g. data-URL media), corrupting the payload.
+  String.raw`${BASE64_SAFE_TOKEN_BOUNDARY}(gAAAA[A-Za-z0-9_=-]{20,})`,
   String.raw`(sk_live_[A-Za-z0-9]{10,})`,
   String.raw`(sk_test_[A-Za-z0-9]{10,})`,
   String.raw`(rk_live_[A-Za-z0-9]{10,})`,
@@ -200,15 +210,15 @@ const DEFAULT_REDACT_PATTERNS: string[] = [
   String.raw`(bkua_[a-z0-9]{40})`,
   String.raw`(CCIPAT_[A-Za-z0-9]{22}_[A-Fa-f0-9]{40})`,
   String.raw`(sbp_[a-z0-9]{40})`,
-  String.raw`(dapi[0-9a-f]{32}(?:-\d)?)`,
+  String.raw`${BASE64_SAFE_TOKEN_BOUNDARY}(dapi[0-9a-f]{32}(?:-\d)?)`,
   String.raw`(dd[pw]_[A-Za-z0-9]{36})`,
   String.raw`(glsa_[A-Za-z0-9_]{41})`,
   String.raw`(glc_eyJ[A-Za-z0-9+/=]{60,160})`,
   String.raw`(nfp_[A-Za-z0-9_]{36})`,
   String.raw`(CFPAT-[A-Za-z0-9_\-]{40,})`,
-  String.raw`(ATCTT3xFfG[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})`,
-  String.raw`(ATATT[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})`,
-  String.raw`(ATBB[A-Za-z0-9_=.-]{16,})`,
+  String.raw`${BASE64_SAFE_TOKEN_BOUNDARY}(ATCTT3xFfG[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})`,
+  String.raw`${BASE64_SAFE_TOKEN_BOUNDARY}(ATATT[A-Za-z0-9+/=_-]+=[A-Za-z0-9]{8})`,
+  String.raw`${BASE64_SAFE_TOKEN_BOUNDARY}(ATBB[A-Za-z0-9_=.-]{16,})`,
   String.raw`(BBDC-[A-Za-z0-9+/@_-]{40,50})`,
   String.raw`(HRKU-AA[A-Za-z0-9_-]{20,})`,
   String.raw`(pat-(?:eu|na)1-[A-Za-z0-9]{8}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{4}\-[A-Za-z0-9]{12})`,
@@ -226,8 +236,8 @@ const DEFAULT_REDACT_PATTERNS: string[] = [
   String.raw`(brv_[A-Za-z0-9]{10,})`,
   String.raw`(xai-[A-Za-z0-9]{30,})`,
   // Additional access-key and token-style prefixes.
-  String.raw`(AKIA[A-Z0-9]{16})`,
-  String.raw`(ASIA[A-Z0-9]{16})`,
+  String.raw`${BASE64_SAFE_TOKEN_BOUNDARY}(AKIA[A-Z0-9]{16})`,
+  String.raw`${BASE64_SAFE_TOKEN_BOUNDARY}(ASIA[A-Z0-9]{16})`,
   String.raw`(AKID[A-Za-z0-9]{10,})`,
   String.raw`(LTAI[A-Za-z0-9]{10,})`,
   String.raw`(hf_[A-Za-z0-9]{10,})`,
@@ -302,6 +312,9 @@ function parsePattern(raw: RedactPattern): RegExp | null {
   }
   if (pattern && typeof raw === "string" && SHELL_REFERENCE_PRESERVING_PATTERN_SOURCES.has(raw)) {
     shellReferencePreservingPatterns.add(pattern);
+  }
+  if (pattern && typeof raw === "string" && raw.startsWith(BASE64_SAFE_TOKEN_BOUNDARY)) {
+    chunkUnsafePatterns.add(pattern);
   }
   return pattern;
 }
@@ -837,7 +850,7 @@ function redactText(
     next = redactFormBody(next);
   }
   for (const pattern of patterns) {
-    next = replacePatternBounded(next, pattern, (...args: unknown[]) => {
+    const replacer = (...args: unknown[]) => {
       const hasNamedGroups =
         args.length > 0 &&
         typeof args[args.length - 1] === "object" &&
@@ -851,7 +864,10 @@ function redactText(
       const offset = typeof args[offsetIndex] === "number" ? args[offsetIndex] : -1;
       const input = typeof args[inputIndex] === "string" ? args[inputIndex] : "";
       return redactMatch(match, groups, pattern, { input, offset });
-    });
+    };
+    next = chunkUnsafePatterns.has(pattern)
+      ? next.replace(pattern, replacer)
+      : replacePatternBounded(next, pattern, replacer);
   }
   return next;
 }
