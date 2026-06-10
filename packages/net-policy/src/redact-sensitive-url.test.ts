@@ -108,6 +108,7 @@ describe("isSensitiveUrlQueryParamName", () => {
     expect(isSensitiveUrlQueryParamName("client%5Fse%20cret")).toBe(true);
     expect(isSensitiveUrlQueryParamName("client%5Fse%00cret")).toBe(true);
     expect(isSensitiveUrlQueryParamName("client_se+cret")).toBe(true);
+    expect(isSensitiveUrlQueryParamName("client_se\u3164cret")).toBe(true);
     expect(isSensitiveUrlQueryParamName("credential")).toBe(true);
     expect(isSensitiveUrlQueryParamName("safe")).toBe(false);
   });

@@ -35,10 +35,7 @@ afterEach(() => {
 describe("redactSensitiveText", () => {
   it("masks env assignments while keeping the key", () => {
     const input = "OPENAI_API_KEY=sk-1234567890abcdef";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("OPENAI_API_KEY=sk-123…cdef");
   });
 
@@ -51,28 +48,19 @@ describe("redactSensitiveText", () => {
       "PASSWORD=${PASSWORD:-}",
       "GITHUB_TOKEN=${GITHUB_TOKEN}",
     ].join("\n");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(input);
   });
 
   it("masks shell env references that do not match the assignment key", () => {
-    const output = redactSensitiveText("DISCORD_BOT_TOKEN=$SUPERSECRET123", {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText("DISCORD_BOT_TOKEN=$SUPERSECRET123", { mode: "tools" });
     expect(output).toBe("DISCORD_BOT_TOKEN=***");
   });
 
   it("masks literal shell env expansion defaults in assignments", () => {
     const fallback = "discordliteral1234567890";
     const input = `DISCORD_BOT_TOKEN="\${DISCORD_BOT_TOKEN:-${fallback}}"`;
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).not.toContain(fallback);
     expect(output).toBe('DISCORD_BOT_TOKEN="${DISC…890}"');
   });
@@ -89,10 +77,7 @@ describe("redactSensitiveText", () => {
     const xai = "issue85049-xai-cleartext-token-ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
     const brave = "issue85049-brave-cleartext-token-ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
     const input = String.raw`raw_params={"command":"export XAI_API_KEY=\"${xai}\" && export BRAVE_API_KEY=\\\"${brave}\\\" && echo blocked"}`;
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toContain("XAI_API_KEY=");
     expect(output).toContain("BRAVE_API_KEY=");
     expect(output).not.toContain(xai);
@@ -102,74 +87,50 @@ describe("redactSensitiveText", () => {
 
   it("masks CLI flags", () => {
     const input = "curl --token abcdef1234567890ghij https://api.test";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("curl --token abcdef…ghij https://api.test");
   });
 
   it("masks hook token CLI flags", () => {
     const input = "gog gmail watch serve --hook-token abcdef1234567890ghij";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("gog gmail watch serve --hook-token abcdef…ghij");
   });
 
   it("does not treat option-alternative prose as a CLI flag secret", () => {
     const input = "Use either --password or --password-file.";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(input);
   });
 
   it("masks sensitive URL query parameters", () => {
     const input = "connect https://user.example/sync?access_token=abcdef1234567890ghij&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("connect https://user.example/sync?access_token=abcdef…ghij&safe=value");
   });
 
   it("masks short URL query tokens fully", () => {
     const input = "cdp=https://browserless.example.com/?token=supersecret123";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("cdp=https://browserless.example.com/?token=***");
   });
 
   it("masks standalone lowercase token assignments in diagnostic output", () => {
     const input = "matrix access_token=abcdef1234567890ghij next";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("matrix access_token=abcdef…ghij next");
   });
 
   it("masks JSON fields", () => {
     const input = '{"token":"abcdef1234567890ghij"}';
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe('{"token":"abcdef…ghij"}');
   });
 
   it("masks payment credential JSON fields without redacting unrelated amounts", () => {
     const input =
       '{"card_number":"4242424242424242","cvc":"123","sharedPaymentToken":"spt_abcdefghijklmnopqrstuvwxyz","payment_credential":"paycred_abcdefghijklmnopqrstuvwxyz","amount":"4200"}';
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       '{"card_number":"***","cvc":"***","sharedPaymentToken":"spt_ab…wxyz","payment_credential":"paycre…wxyz","amount":"4200"}',
     );
@@ -185,10 +146,7 @@ describe("redactSensitiveText", () => {
       `payload: {"credential":"${credential}"}`,
       `details: { credential: '${credential}' }`,
     ].join("\n");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toContain('"app_secret":"feishu…7890"');
     expect(output).toContain("appSecret: 'feishu…7890'");
     expect(output).toContain("client_secret: 'oauth_…7890'");
@@ -207,10 +165,7 @@ describe("redactSensitiveText", () => {
       "--payment-credential paycred_abcdefghijklmnopqrstuvwxyz",
       "--card-number 4000056655665556",
     ].join(" ");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).not.toContain("4242424242424242");
     expect(output).not.toContain("4000056655665556");
     expect(output).not.toContain("spt_abcdefghijklmnopqrstuvwxyz");
@@ -226,10 +181,7 @@ describe("redactSensitiveText", () => {
     const bearer = "feishu_tenant_access_abcdef123456";
     const cookie = "session_cookie_value_abcdef123456";
     const input = `headers: { authorization: 'Bearer ${bearer}', cookie: '${cookie}' }`;
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toContain("authorization: '***'");
     expect(output).toContain("cookie: 'sessio…3456'");
     expect(output).not.toContain(bearer);
@@ -239,10 +191,7 @@ describe("redactSensitiveText", () => {
   it("masks payment credential URL query parameters", () => {
     const input =
       "POST /authorize?shared_payment_token=spt_abcdefghijklmnopqrstuvwxyz&card_number=4242424242424242&amount=4200";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       "POST /authorize?shared_payment_token=spt_ab…wxyz&card_number=***&amount=4200",
     );
@@ -283,19 +232,13 @@ describe("redactSensitiveText", () => {
 
   it("masks bearer tokens", () => {
     const input = "Authorization: Bearer abcdef1234567890ghij";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("Authorization: Bearer abcdef…ghij");
   });
 
   it("masks Basic authorization header tokens", () => {
     const secret = "c2VjcmV0OnBhc3M=";
-    const output = redactSensitiveText(`Authorization: Basic ${secret}`, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(`Authorization: Basic ${secret}`, { mode: "tools" });
 
     expect(output).toBe("Authorization: Basic ***");
     expect(output).not.toContain(secret);
@@ -303,10 +246,7 @@ describe("redactSensitiveText", () => {
 
   it("masks Bot authorization header tokens", () => {
     const secret = `${"A".repeat(24)}.${"B".repeat(6)}.${"C".repeat(27)}`;
-    const output = redactSensitiveText(`Authorization: Bot ${secret}`, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(`Authorization: Bot ${secret}`, { mode: "tools" });
 
     expect(output).toBe("Authorization: Bot AAAAAA…CCCC");
     expect(output).not.toContain(secret);
@@ -321,10 +261,7 @@ describe("redactSensitiveText", () => {
       `x-pomerium-jwt-assertion: ${pomeriumJwt}`,
       `X-Api-Key=${apiKey}`,
     ].join("\n");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
 
     expect(output).toContain("X-OpenClaw-Token: supers…7890");
     expect(output).toContain("x-pomerium-jwt-assertion: eyJhea…3456");
@@ -336,10 +273,7 @@ describe("redactSensitiveText", () => {
 
   it("masks token prefixes embedded after adjacent text", () => {
     const token = `ghp_${"a".repeat(5_000)}`;
-    const output = redactSensitiveText(`prefix-${token} suffix`, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(`prefix-${token} suffix`, { mode: "tools" });
     expect(output).toBe("prefix-ghp_aa…aaaa suffix");
     expect(output).not.toContain(token);
     expect(output).not.toContain("a".repeat(100));
@@ -347,63 +281,44 @@ describe("redactSensitiveText", () => {
 
   it("masks URL query tokens", () => {
     const input = "GET /_matrix/client/v3/sync?access_token=abcdef1234567890ghij";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("GET /_matrix/client/v3/sync?access_token=abcdef…ghij");
   });
 
   it("masks bot-style tokens", () => {
     const input = "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("123456…cdef");
   });
 
   it("masks bot API URL tokens", () => {
     const input =
       "GET https://api.example.test/bot123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef/getMe HTTP/1.1";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("GET https://api.example.test/bot123456…cdef/getMe HTTP/1.1");
   });
 
   it("redacts short tokens fully", () => {
     const input = "TOKEN=shortvalue";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("TOKEN=***");
   });
 
   it("does not redact lowercase key diagnostics", () => {
     const input = 'agents.defaults: Unrecognized key: "llm"';
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(input);
   });
 
   it("does not redact diagnostic code assignments outside URL or form bodies", () => {
     const input = "Oops: failed: code=E1 status=500";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(input);
   });
 
   it("masks standalone pass assignments", () => {
     const output = redactSensitiveText("db pass=opaque-pass-secret-1234567890 next", {
       mode: "tools",
-      patterns: defaults,
     });
     expect(output).toBe("db pass=opaque…7890 next");
     expect(output).not.toContain("opaque-pass-secret-1234567890");
@@ -411,10 +326,7 @@ describe("redactSensitiveText", () => {
 
   it("masks complete unquoted assignment values that contain delimiter-like punctuation", () => {
     const input = "password=abc,def token=abc;def client_secret=abc]def pass=abc)def";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("password=*** token=*** client_secret=*** pass=***");
     expect(output).not.toContain("abc,def");
     expect(output).not.toContain("abc;def");
@@ -424,39 +336,27 @@ describe("redactSensitiveText", () => {
 
   it("masks quoted standalone assignments", () => {
     const input = "password='abc;def' token=\"abc;def\" secret=`abc;def`";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("password='***' token=\"***\" secret=`***`");
     expect(output).not.toContain("abc;def");
   });
 
   it("masks sensitive URL query params while preserving non-sensitive params", () => {
     const input = "GET /_matrix/client/v3/sync?access_token=abcdef1234567890ghij&since=123";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("GET /_matrix/client/v3/sync?access_token=abcdef…ghij&since=123");
   });
 
   it("treats sensitive URL query param names case-insensitively", () => {
     const input = "connect https://gateway.example/ws?Access-Token=short-token&ok=1";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("connect https://gateway.example/ws?Access-Token=***&ok=1");
   });
 
   it("masks opaque sensitive URL query params without known token prefixes", () => {
     const input =
       "callback https://example.test/oauth?code=oauth-code-abc123&state=visible&x-amz-signature=abc123xyz&x-amz-security-token=aws-session-token-123&authorization=authz-secret-123&private_key=pk-secret-123&app_secret=app-secret-123&credential=credential-secret-123";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       "callback https://example.test/oauth?code=***&state=visible&x-amz-signature=***&x-amz-security-token=aws-se…-123&authorization=***&private_key=***&app_secret=***&credential=creden…-123",
     );
@@ -473,10 +373,7 @@ describe("redactSensitiveText", () => {
       "redis://:redis-password-1234567890@cache.example.test/0",
       "rediss://cache:redis-tls-password-1234567890@cache.example.test/0",
     ].join(" ");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).not.toContain("browser-password-1234567890");
     expect(output).not.toContain("empty-username-password-1234567890");
     expect(output).not.toContain("database-password-1234567890");
@@ -496,10 +393,7 @@ describe("redactSensitiveText", () => {
   it("masks sensitive form-urlencoded body fields by exact key", () => {
     const input =
       "code=oauth-code-123&hook_token=hook-token-123&jwt=jwt-secret-123&pass=form-pass-123&client_secret=oauth-client-secret-1234567890&refresh_token=refresh-token-1234567890&token_count=42&session_id=session-visible";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       "code=***&hook_token=***&jwt=***&pass=***&client_secret=***&refresh_token=***&token_count=42&session_id=session-visible",
     );
@@ -514,10 +408,7 @@ describe("redactSensitiveText", () => {
   it("masks non-auth form body secret fields after a safe first key", () => {
     const input =
       "client_id=visible&app_secret=opaque-app-secret&credential=opaque-credential&shared_payment_token=spt_abcdefghijklmnopqrstuvwxyz&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       "client_id=visible&app_secret=***&credential=***&shared_payment_token=***&safe=value",
     );
@@ -529,10 +420,7 @@ describe("redactSensitiveText", () => {
   it("masks form body secret fields embedded in diagnostic prose", () => {
     const input =
       "body: client_id=visible&app_secret=opaque-app-secret&credential=opaque-credential&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: client_id=visible&app_secret=***&credential=***&safe=value");
     expect(output).not.toContain("opaque-app-secret");
     expect(output).not.toContain("opaque-credential");
@@ -541,10 +429,7 @@ describe("redactSensitiveText", () => {
   it("masks form body secret fields in multiline tool output", () => {
     const input =
       "request start\nbody: client_id=visible&app_secret=opaque-app-secret&safe=value\nrequest end";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       "request start\nbody: client_id=visible&app_secret=***&safe=value\nrequest end",
     );
@@ -553,10 +438,7 @@ describe("redactSensitiveText", () => {
 
   it("masks percent-encoded form body secret keys", () => {
     const input = "body: client%5Fsecret=oauth-secret&app%2Dsecret=app-secret&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: client%5Fsecret=***&app%2Dsecret=***&safe=value");
     expect(output).not.toContain("oauth-secret");
     expect(output).not.toContain("app-secret");
@@ -565,10 +447,7 @@ describe("redactSensitiveText", () => {
   it("masks quoted form body secret fields embedded in diagnostic prose", () => {
     const input =
       'body: "client_secret=oauth-secret&safe=value" fallback: `safe=value&app_secret=app-secret`';
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       'body: "client_secret=***&safe=value" fallback: `safe=value&app_secret=***`',
     );
@@ -578,30 +457,21 @@ describe("redactSensitiveText", () => {
 
   it("masks percent-encoded form body keys spliced with invisible characters", () => {
     const input = "body: client%5Fse\u200Bcret=oauth-secret&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: client%5Fse\u200Bcret=***&safe=value");
     expect(output).not.toContain("oauth-secret");
   });
 
   it("masks form body keys with leading invisible separators", () => {
     const input = "body: \u200Bclient_secret=oauth-secret&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: \u200Bclient_secret=***&safe=value");
     expect(output).not.toContain("oauth-secret");
   });
 
   it("masks form body keys with plus-encoded separators", () => {
     const input = "body: client_se+cret=oauth-secret&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: client_se+cret=***&safe=value");
     expect(output).not.toContain("oauth-secret");
   });
@@ -609,10 +479,7 @@ describe("redactSensitiveText", () => {
   it("masks form and query keys with raw control separators", () => {
     const input =
       "body: client_se\u0000cret=oauth-secret&safe=value GET /cb?client_se\u0001cret=query-secret&safe=1";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       "body: client_se\u0000cret=***&safe=value GET /cb?client_se\u0001cret=***&safe=1",
     );
@@ -623,10 +490,7 @@ describe("redactSensitiveText", () => {
   it("masks quoted form body values after equals", () => {
     const input =
       'body: password="opaque-password-secret" client_id=visible&app_secret="opaque-app-secret"&safe=1';
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: password=*** client_id=visible&app_secret=***&safe=1");
     expect(output).not.toContain("opaque-password-secret");
     expect(output).not.toContain("opaque-app-secret");
@@ -634,10 +498,7 @@ describe("redactSensitiveText", () => {
 
   it("masks form body keys with percent-encoded invisible separators", () => {
     const input = "body: client%5Fse%E2%80%8Bcret=oauth-secret&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: client%5Fse%E2%80%8Bcret=***&safe=value");
     expect(output).not.toContain("oauth-secret");
   });
@@ -645,10 +506,7 @@ describe("redactSensitiveText", () => {
   it("masks form body keys with percent-encoded whitespace and control separators", () => {
     const input =
       "body: client%5Fse%20cret=space-secret&safe=value next: client%5Fse%00cret=nul-secret&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       "body: client%5Fse%20cret=***&safe=value next: client%5Fse%00cret=***&safe=value",
     );
@@ -658,20 +516,14 @@ describe("redactSensitiveText", () => {
 
   it("masks URL query keys with percent-encoded invisible separators", () => {
     const input = "GET https://example.test/cb?client%5Fse%E2%80%8Bcret=oauth-secret&safe=1";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("GET https://example.test/cb?client%5Fse%E2%80%8Bcret=***&safe=1");
     expect(output).not.toContain("oauth-secret");
   });
 
   it("masks URL query keys with plus-encoded separators", () => {
     const input = "GET https://example.test/cb?client_se+cret=oauth-secret&safe=1";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("GET https://example.test/cb?client_se+cret=***&safe=1");
     expect(output).not.toContain("oauth-secret");
   });
@@ -679,10 +531,7 @@ describe("redactSensitiveText", () => {
   it("masks URL query keys with percent-encoded whitespace and control separators", () => {
     const input =
       "GET https://example.test/cb?client%5Fse%20cret=space-secret&safe=1&client%5Fse%00cret=nul-secret";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       "GET https://example.test/cb?client%5Fse%20cret=***&safe=1&client%5Fse%00cret=***",
     );
@@ -692,20 +541,14 @@ describe("redactSensitiveText", () => {
 
   it("masks encoded sensitive URL query keys after later separators", () => {
     const input = "GET https://example.test/cb?scope=read,write&client%5Fsecret=oauth-secret";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("GET https://example.test/cb?scope=read,write&client%5Fsecret=***");
     expect(output).not.toContain("oauth-secret");
   });
 
   it("masks complete encoded URL query values that contain commas", () => {
     const input = "GET https://example.test/cb?client%5Fsecret=abc,def&safe=1";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("GET https://example.test/cb?client%5Fsecret=***&safe=1");
     expect(output).not.toContain("abc,def");
     expect(output).not.toContain(",def");
@@ -714,10 +557,7 @@ describe("redactSensitiveText", () => {
   it("masks complete URL query values that contain delimiter-like punctuation", () => {
     const input =
       "GET /cb?token=abc)def&safe=1 /cb?client%5Fsecret=abc]def&safe=1 /cb?code=short#frag";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       "GET /cb?token=***&safe=1 /cb?client%5Fsecret=***&safe=1 /cb?code=***#frag",
     );
@@ -728,10 +568,7 @@ describe("redactSensitiveText", () => {
 
   it("masks quoted URL query values after equals", () => {
     const input = 'GET /cb?token="opaque-token-secret"&safe=1 /cb?client%5Fsecret="oauth-secret"';
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("GET /cb?token=opaque…cret&safe=1 /cb?client%5Fsecret=***");
     expect(output).not.toContain("opaque-token-secret");
     expect(output).not.toContain("oauth-secret");
@@ -739,10 +576,7 @@ describe("redactSensitiveText", () => {
 
   it("masks complete encoded form values that contain commas", () => {
     const input = "body: client%5Fsecret=abc,def&safe=value";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: client%5Fsecret=***&safe=value");
     expect(output).not.toContain("abc,def");
     expect(output).not.toContain(",def");
@@ -750,10 +584,7 @@ describe("redactSensitiveText", () => {
 
   it("masks complete form values that contain delimiter-like punctuation", () => {
     const input = "body: client_secret=abc)def&safe=1 next: client%5Fsecret=abc]def&safe=1";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: client_secret=***&safe=1 next: client%5Fsecret=***&safe=1");
     expect(output).not.toContain("abc)def");
     expect(output).not.toContain("abc]def");
@@ -764,10 +595,7 @@ describe("redactSensitiveText", () => {
       "client%5Fsecret=single-secret",
       "trace body: client%5Fsecret=multiline-secret&safe=1",
     ].join("\n");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("client%5Fsecret=***\ntrace body: client%5Fsecret=***&safe=1");
     expect(output).not.toContain("single-secret");
     expect(output).not.toContain("multiline-secret");
@@ -775,29 +603,20 @@ describe("redactSensitiveText", () => {
 
   it("masks single-pair form fields in explicit body contexts", () => {
     const input = "body: code=oauth-code-123 form_body=signature=aws-signature-123 Oops code=E1";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("body: code=*** form_body=signature=*** Oops code=E1");
     expect(output).not.toContain("oauth-code-123");
     expect(output).not.toContain("aws-signature-123");
   });
 
   it("masks entire-line explicit body wrapper form payloads", () => {
-    const output = redactSensitiveText("body=client_secret=oauth-secret&safe=1", {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText("body=client_secret=oauth-secret&safe=1", { mode: "tools" });
     expect(output).toBe("body=client_secret=***&safe=1");
     expect(output).not.toContain("oauth-secret");
 
     const outputWithLaterSecret = redactSensitiveText(
       "form_body=client_secret=oauth-secret&app_secret=app-secret",
-      {
-        mode: "tools",
-        patterns: defaults,
-      },
+      { mode: "tools" },
     );
     expect(outputWithLaterSecret).toBe("form_body=client_secret=***&app_secret=***");
     expect(outputWithLaterSecret).not.toContain("oauth-secret");
@@ -806,10 +625,7 @@ describe("redactSensitiveText", () => {
 
   it("masks first-position form-urlencoded fields embedded in larger log lines", () => {
     const input = "manual callback code=oauth-code-123&state=visible";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("manual callback code=***&state=visible");
     expect(output).not.toContain("oauth-code-123");
   });
@@ -830,10 +646,7 @@ describe("redactSensitiveText", () => {
       "ZYXWVUT987654321",
       "-----END PRIVATE KEY-----",
     ].join("\n");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(
       ["-----BEGIN PRIVATE KEY-----", "…redacted…", "-----END PRIVATE KEY-----"].join("\n"),
     );
@@ -887,55 +700,37 @@ describe("redactSensitiveText", () => {
 
   it("redacts large payloads with bounded regex passes", () => {
     const input = `${"x".repeat(40_000)} OPENAI_API_KEY=sk-1234567890abcdef ${"y".repeat(40_000)}`;
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toContain("OPENAI_API_KEY=sk-123…cdef");
   });
 
   it("masks Tencent Cloud SecretId (AKID prefix, uppercase-only)", () => {
     const input = "SecretId is AKIDZ8EXAMPLEFAKE01KEY99TEST";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("SecretId is AKIDZ8…TEST");
   });
 
   it("masks Tencent Cloud SecretId with mixed-case characters", () => {
     const input = "AKIDz8exampleFake01Key99Test";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("AKIDz8…Test");
   });
 
   it("masks Alibaba Cloud AccessKey ID (LTAI prefix)", () => {
     const input = "AccessKeyId=LTAI5tExampleFakeKeyXyz9";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("AccessKeyId=LTAI5t…Xyz9");
   });
 
   it("masks HuggingFace tokens (hf_ prefix)", () => {
     const input = "hf_ABCDEFghijklmnopqrstuv";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("hf_ABC…stuv");
   });
 
   it("masks Replicate tokens (r8_ prefix)", () => {
     const input = "r8_ABCDEFghijklmnopqrstuv";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe("r8_ABC…stuv");
   });
 
@@ -1003,36 +798,100 @@ describe("redactSensitiveText", () => {
       "brv_abcdefghijklmnopqrstuvwxyz",
       "xai-abcdefghijklmnopqrstuvwxyzABCDE",
     ];
-    const input = tokens.join("\n");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    // Redact each fixture alone so every vendor pattern proves it stays reachable through
+    // DEFAULT_REDACT_PREFILTER_RE; a joined corpus would let one trigger unlock all others.
     for (const token of tokens) {
-      expect(output).not.toContain(token);
+      expect(redactSensitiveText(token, { mode: "tools" }), token).not.toContain(token);
     }
-    expect(output).toContain("AKIAAB…MNOP");
-    expect(output).toContain("sk_liv…wxyz");
-    expect(output).toContain("SG.abc…wxyz");
-    expect(output).toContain("xai-ab…BCDE");
+    expect(redactSensitiveText("AKIAABCDEFGHIJKLMNOP", { mode: "tools" })).toBe("AKIAAB…MNOP");
+    expect(
+      redactSensitiveText(["sk", "live", "abcdefghijklmnopqrstuvwxyz"].join("_"), {
+        mode: "tools",
+      }),
+    ).toBe("sk_liv…wxyz");
+    expect(
+      redactSensitiveText("SG.abcdefghijklmnopqrstuvwxyz.0123456789abcdefghijklmnopqrstuvwxyz", {
+        mode: "tools",
+      }),
+    ).toBe("SG.abc…wxyz");
+    expect(redactSensitiveText("xai-abcdefghijklmnopqrstuvwxyzABCDE", { mode: "tools" })).toBe(
+      "xai-ab…BCDE",
+    );
   });
 
   it("does not redact ordinary identifiers containing short token-prefix substrings", () => {
     const input =
       "npm_telegram_package_spec ask_openclaw_query_patterns team_management risk_assessment glpat-docs dapi-example sbp_short nfp_site CCIPAT_docs ATATT-example";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).toBe(input);
+  });
+
+  it("masks bare sensitive query and form keys through the default options path", () => {
+    expect(
+      redactSensitiveText("GET https://example.test/oauth?code=opaque-grant-123", {
+        mode: "tools",
+      }),
+    ).toBe("GET https://example.test/oauth?code=***");
+    expect(redactSensitiveText("jwt=opaque.jwt.value&safe=1", { mode: "tools" })).toBe(
+      "jwt=***&safe=1",
+    );
+    expect(redactSensitiveText("db pass=opaquepass123 next", { mode: "tools" })).toBe(
+      "db pass=*** next",
+    );
+  });
+
+  it("masks obfuscated form keys with opaque values through the default options path", () => {
+    // Values intentionally avoid literal prefilter trigger words so the obfuscated key alone
+    // must make the default fast path run.
+    expect(
+      redactSensitiveText("body: client%5Fse\u200Bcret=opaque-value-123&safe=1", {
+        mode: "tools",
+      }),
+    ).toBe("body: client%5Fse\u200Bcret=***&safe=1");
+    expect(
+      redactSensitiveText("GET https://example.test/cb?client_se+cret=opaque-value-123&safe=1", {
+        mode: "tools",
+      }),
+    ).toBe("GET https://example.test/cb?client_se+cret=***&safe=1");
+    expect(
+      redactSensitiveText("body: client_secre%74=opaque-value-123&safe=1", { mode: "tools" }),
+    ).toBe("body: client_secre%74=***&safe=1");
+    expect(
+      redactSensitiveText("body: client_se\u3164cret\u3164=opaque-value-123&safe=1", {
+        mode: "tools",
+      }),
+    ).toBe("body: client_se\u3164cret\u3164=***&safe=1");
+  });
+
+  it("masks connection-string passwords through the default options path", () => {
+    expect(
+      redactSensitiveText("postgres://dbuser:opaquepw12345@db.example.test/openclaw", {
+        mode: "tools",
+      }),
+    ).toBe("postgres://dbuser:***@db.example.test/openclaw");
+  });
+
+  it("masks quoted standalone values containing the other quote character", () => {
+    const input = `password="it's-a-secret" next`;
+    expect(redactSensitiveText(input, { mode: "tools" })).toBe('password="***" next');
+  });
+
+  it("masks unterminated quoted standalone values", () => {
+    const input = 'token="opaque-abc123 rest';
+    expect(redactSensitiveText(input, { mode: "tools" })).toBe("token=*** rest");
+  });
+
+  it("treats explicit default patterns like the built-in default path", () => {
+    const input =
+      'GET /cb?client_secret=oauth-secret-123&safe=1 glpat-abcdefghijklmnopqrstuv password="it\'s"';
+    expect(redactSensitiveText(input, { mode: "tools", patterns: defaults })).toBe(
+      redactSensitiveText(input, { mode: "tools" }),
+    );
   });
 
   it("redacts raw secret values that contain an ellipsis", () => {
     const input = "password=abcdef…1234567890";
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
 
     expect(output).toBe("password=***");
     expect(redactSensitiveFieldValue("password", "abcdef…1234567890")).toBe("***");
@@ -1044,10 +903,7 @@ describe("redactSensitiveText", () => {
       "1//0fake-refresh-token-with-enough-length",
       "eyJheaderabcd.eyJpayloadabcd.signatureabcd123456",
     ].join(" ");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).not.toContain("ya29.fake-access-token");
     expect(output).not.toContain("1//0fake-refresh-token");
     expect(output).not.toContain("eyJheaderabcd.eyJpayloadabcd.signatureabcd123456");
@@ -1060,10 +916,7 @@ describe("redactSensitiveText", () => {
       '{"password":"lmno-pqrs-tuvw-xyza"}',
       "main-test-case-name",
     ].join(" ");
-    const output = redactSensitiveText(input, {
-      mode: "tools",
-      patterns: defaults,
-    });
+    const output = redactSensitiveText(input, { mode: "tools" });
     expect(output).not.toContain("abcd-efgh-ijkl-mnop");
     expect(output).not.toContain("qrst-uvwx-yzab-cdef");
     expect(output).not.toContain("lmno-pqrs-tuvw-xyza");
@@ -1232,7 +1085,7 @@ describe("redactSecrets", () => {
 
 describe("redactSensitiveLines", () => {
   it("redacts matching content across all lines", () => {
-    const resolved = resolveRedactOptions({ mode: "tools", patterns: defaults });
+    const resolved = resolveRedactOptions({ mode: "tools" });
     const lines = ["curl --token abcdef1234567890ghij https://api.test", "normal log line"];
     const result = redactSensitiveLines(lines, resolved);
     expect(result[0]).toBe("curl --token abcdef…ghij https://api.test");
@@ -1254,12 +1107,12 @@ describe("redactSensitiveLines", () => {
   });
 
   it("returns empty array unchanged — does not produce a synthetic blank line", () => {
-    const resolved = resolveRedactOptions({ mode: "tools", patterns: defaults });
+    const resolved = resolveRedactOptions({ mode: "tools" });
     expect(redactSensitiveLines([], resolved)).toStrictEqual([]);
   });
 
   it("redacts a PEM block spanning multiple lines in the array", () => {
-    const resolved = resolveRedactOptions({ mode: "tools", patterns: defaults });
+    const resolved = resolveRedactOptions({ mode: "tools" });
     const lines = [
       "log: key follows",
       "-----BEGIN PRIVATE KEY-----",
@@ -1277,7 +1130,7 @@ describe("redactSensitiveLines", () => {
   });
 
   it("applies form-body redaction per line before joining for multiline patterns", () => {
-    const resolved = resolveRedactOptions({ mode: "tools", patterns: defaults });
+    const resolved = resolveRedactOptions({ mode: "tools" });
     const lines = [
       "jwt=opaque-jwt-secret-123&safe=1",
       "key=opaque-key-secret-123&safe=1",

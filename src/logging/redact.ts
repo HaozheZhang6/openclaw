@@ -113,8 +113,11 @@ const STRUCTURED_SECRET_ENV_FIELD_RE = new RegExp(
 
 const ENV_ASSIGNMENT_REDACT_PATTERN = String.raw`/\b[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|${PAYMENT_CREDENTIAL_ENV_KEYS})\b\s*[=:]\s*(["']?)([^\s"'\\]+)\1/g`;
 const ESCAPED_ENV_ASSIGNMENT_REDACT_PATTERN = String.raw`/\b[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|${PAYMENT_CREDENTIAL_ENV_KEYS})\b\s*[=:]\s*\\+(["'])([^\s"'\\]+)\\+\1/g`;
-const STANDALONE_ASSIGNMENT_QUOTED_REDACT_PATTERN = String.raw`(^|[\s,;])(?:${STANDALONE_ASSIGNMENT_SECRET_KEYS})=(["'\x60])([^"'\x60\r\n]+)\2`;
-const STANDALONE_ASSIGNMENT_REDACT_PATTERN = String.raw`(^|[\s,;])(?:${STANDALONE_ASSIGNMENT_SECRET_KEYS})=([^\s&#"'\x60<>]+)`;
+// Quoted values may contain the other quote characters (`password="it's"`); only the matching
+// closing quote ends the value. The unquoted variant accepts one leading quote so unterminated
+// quotes still mask like plain values instead of escaping both patterns.
+const STANDALONE_ASSIGNMENT_QUOTED_REDACT_PATTERN = String.raw`(^|[\s,;])(?:${STANDALONE_ASSIGNMENT_SECRET_KEYS})=(["'\x60])((?:(?!\2)[^\r\n])+)\2`;
+const STANDALONE_ASSIGNMENT_REDACT_PATTERN = String.raw`(^|[\s,;])(?:${STANDALONE_ASSIGNMENT_SECRET_KEYS})=(["'\x60]?[^\s&#"'\x60<>]+)`;
 const SHELL_REFERENCE_PRESERVING_PATTERN_SOURCES = new Set([
   ENV_ASSIGNMENT_REDACT_PATTERN,
   ESCAPED_ENV_ASSIGNMENT_REDACT_PATTERN,
@@ -236,8 +239,34 @@ const DEFAULT_REDACT_PATTERNS: string[] = [
 ];
 let defaultResolvedPatterns: RegExp[] | undefined;
 
-const DEFAULT_REDACT_PREFILTER_RE =
-  /(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|AUTH|COOKIE|SIGNATURE|CARD|CVC|CVV|PAYMENT|PRIVATE KEY|[?&]pass=|security[-_]?code|securityCode|\bBearer\s+|sk-|ghp_|github_pat_|xox[baprs]-|xapp-|gsk_|AIza|ya29\.|1\/\/0|eyJ|pplx-|npm_|AKID|LTAI|hf_|r8_|\bbot\d{6,}:|\b\d{6,}:[A-Za-z0-9_-]{20,})/i;
+// Fast-path gate: with no user-configured patterns, redactSensitiveText skips the full
+// default-pattern walk unless one of these triggers matches. Every DEFAULT_REDACT_PATTERNS
+// entry and sensitive form/URL key must stay reachable here — a missing trigger silently
+// leaks that secret shape, so each family keeps a default-options fixture in redact.test.ts.
+const DEFAULT_REDACT_PREFILTER_SOURCES: string[] = [
+  // Sensitive key names shared by the env/JSON/query/form/header/assignment families.
+  String.raw`KEY|TOKEN|SECRET|PASSWORD|PASSWD|AUTH|COOKIE|SIGNATURE|CREDENTIAL|CARD|CVC|CVV|PAYMENT|PRIVATE KEY`,
+  String.raw`security[-_]?code|\bpass=|jwt=|session=|code=`,
+  String.raw`\bBearer\s+`,
+  // URL userinfo and connection-string password slots (`scheme://user:pass@host`).
+  String.raw`:\/\/[^\/\s:@]*:[^\/\s@]+@`,
+  // Vendor token prefixes and webhook hosts, ordered like DEFAULT_REDACT_PATTERNS.
+  String.raw`sk-|gh[opsur]_|github_pat_|glpat-|gloas-|xox[baprs]-|xapp-|hooks\.slack\.com|discord|gsk_|AIza|ya29\.|1\/\/0|eyJ|pplx-|fal_|fc-|bb_live_|gAAAA|[sr]k_(?:live|test)_|\bSG\.|npm_|pypi-|do[opr]_v1_|dp\.(?:ct|pt|sa|st|scim|audit)\.|dckr_|bkua_|CCIPAT_|sbp_|dapi[0-9a-f]|dd[pw]_|glsa_|nfp_|CFPAT-|ATCTT3|ATATT|ATBB|BBDC-|HRKU-|pat-(?:eu|na)1-|apify_api_|FlyV1|fio-u-|tvly-|exa_|syt_|retaindb_|mem0_|brv_|xai-`,
+  String.raw`(?:^|[^A-Za-z0-9_])(?:am_|sk_)`,
+  String.raw`A[KS]IA[A-Z0-9]|AKID|LTAI|hf_|api_org_|r8_`,
+  String.raw`\bbot\d{6,}:|\b\d{6,}:[A-Za-z0-9_-]{20,}`,
+  // Obfuscated form/URL keys: percent escapes can rewrite any key letter, while plus or
+  // invisible splices break the literal key-name triggers above mid-word. After a splice the
+  // tail may mix further splices with key characters (e.g. an interior plus a trailing
+  // filler), but at least one key character must follow a splice so bare `+=` or line-leading
+  // `===` separators do not trip the fast path.
+  String.raw`%[0-9A-Fa-f]{2}[A-Za-z0-9_%.-]*=`,
+  String.raw`(?:\+|[${FORM_BODY_KEY_INVISIBLE_CHARS}])(?:[${FORM_BODY_KEY_INVISIBLE_CHARS}+]*[A-Za-z0-9_%.-])+[${FORM_BODY_KEY_INVISIBLE_CHARS}+]*=`,
+];
+const DEFAULT_REDACT_PREFILTER_RE = new RegExp(
+  `(?:${DEFAULT_REDACT_PREFILTER_SOURCES.join("|")})`,
+  "iu",
+);
 
 export type RedactOptions = {
   mode?: RedactSensitiveMode;
@@ -576,8 +605,8 @@ function redactFormBodyLine(text: string): string {
   const redacted = contextRedacted.replace(
     FORM_BODY_SUBSTRING_RE,
     (match, prefix: string, body: string) => {
-      const redacted = redactFormEncodedPairs(body);
-      return redacted === body ? match : `${prefix}${redacted}`;
+      const redactedBody = redactFormEncodedPairs(body);
+      return redactedBody === body ? match : `${prefix}${redactedBody}`;
     },
   );
   return redactFormBodyContextSinglePairs(redactEncodedFormPairs(redacted));
@@ -760,6 +789,11 @@ function redactMatch(
   }
   const selected = selectSecretCapture(match, groups);
   const token = selected.value;
+  // An earlier pass (form-body or quoted-assignment masking) may already have replaced this
+  // value with ***; re-masking would strip its quote wrapper around the placeholder.
+  if (splitSecretValueForMask(token).maskable === "***") {
+    return match;
+  }
   const isShellReferencePattern = shellReferencePreservingPatterns.has(pattern);
   // Preserve shell variable references (e.g. `MY_TOKEN=$MY_TOKEN`) for assignment patterns
   // registered as shell-reference-preserving, so non-secret expansions that merely echo the

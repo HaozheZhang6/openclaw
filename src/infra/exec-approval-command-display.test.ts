@@ -104,6 +104,12 @@ describe("sanitizeExecApprovalDisplayText", () => {
     expect(result).toContain("https://api.example.com");
   });
 
+  it("masks newly added vendor token prefixes through the default redaction path", () => {
+    const token = "glpat-abcdefghijklmnopqrstuv";
+    const result = sanitizeExecApprovalDisplayText(`deploy --with ${token}`);
+    expect(result).not.toContain(token);
+  });
+
   it("does not let contextual secret matches hide split-token bypass detection", () => {
     const discordToken = `${"A".repeat(24)}.${"B".repeat(6)}.${"C".repeat(27)}`;
     const cmd = `discord sk-abc123\u200B456789012345678 ${discordToken}`;

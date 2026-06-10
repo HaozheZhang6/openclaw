@@ -37,7 +37,9 @@ const SENSITIVE_URL_QUERY_PARAM_NAMES = new Set([
   "credential",
   "authorization",
 ]);
-const URL_QUERY_NAME_SEPARATOR_RE = /[\p{C}\p{Z}+]/gu;
+// Keep in sync with FORM_BODY_KEY_SEPARATOR_RE in src/logging/redact.ts: Hangul fillers are
+// category Lo, so \p{C}\p{Z} alone would let them splice sensitive key names.
+const URL_QUERY_NAME_SEPARATOR_RE = /[\p{C}\p{Z}\u115F\u1160\u3164\uFFA0+]/gu;
 
 function normalizeUrlQueryParamName(name: string): string {
   const stripped = name.replace(URL_QUERY_NAME_SEPARATOR_RE, "");
